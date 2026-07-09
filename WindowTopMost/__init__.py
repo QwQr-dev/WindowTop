@@ -3,7 +3,7 @@
 # 原项目为：https://github.com/xmc0211/WindowTopMost
 #
 # Warning:
-# 如果要编译 WindowTopMost.dll在 Python 环境下使用，需要注意以下情况
+# 如果要编译 WindowTopMost.dll 在 Python 环境下使用，需要注意以下情况（项目中的 WindowTopMost.dll 已经处理过，无需再更改）
 # 原 WindowTopMost.dll 中的 WTMGetWorkerPath() （位于 DllMain.cpp）函数的源码为
 #
 # std::_tstring WTMGetWorkerPath() {

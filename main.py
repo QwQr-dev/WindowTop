@@ -93,11 +93,13 @@ class MainWindow(QtWidgets.QMainWindow):
         loguru.logger.debug(f'PID: {self.locked_pid}')
         loguru.logger.debug(f'进程名: {self.locked_proc_name}')
         if not ws.ShowWindow(self.self_hwnd, ws.SW_SHOWNORMAL):     # bug fixed: 根据文档说明，修复其逻辑错误的问题
-            fs.WindowTop(self.set_window_top_state, self.locked_hwnd, self.ui.checkBox.isChecked(), self.ui.comboBox.currentIndex())
-            if self.set_window_top_state:
-                loguru.logger.debug('已成功恢复窗口并将目标窗口置顶')
+            if fs.WindowTop(self.set_window_top_state, self.locked_hwnd, self.ui.checkBox.isChecked(), self.ui.comboBox.currentIndex()):
+                if self.set_window_top_state:
+                    loguru.logger.debug('已成功恢复窗口并将目标窗口置顶')
+                else:
+                    loguru.logger.debug('已成功恢复窗口并将目标窗口取消置顶')
             else:
-                loguru.logger.debug('已成功恢复窗口并将目标窗口取消置顶')
+                loguru.logger.error(f"未能置顶窗口，原因如下: {ws.WinError(ws.GetLastError())}")
         ws.SetForegroundWindow(self.self_hwnd)
 
     def deal_opened_file_location(self):
@@ -141,14 +143,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     loguru.logger.info('程序初始化')
-
     if not ws.IsUserAnAdmin():
         ud.messagebox.showinfo('WindowTop', '建议以管理员运行，部分功能会因此受限')
 
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    self_hwnd = fs.get_self_hwnd()
+    self_hwnd = window.winId()
     window.self_hwnd = self_hwnd
     fs.WindowTop(True, self_hwnd)   # 窗口置顶
     fs.control_menu_state(self_hwnd)    # 默认为禁止窗口最大化和调整窗口大小

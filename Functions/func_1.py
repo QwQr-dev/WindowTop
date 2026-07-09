@@ -46,7 +46,6 @@ def WindowTop(
     return True
 
 
-
 def RunFileDlg(
     title: str | None = None, 
     description: str | None = None, 
@@ -81,3 +80,6 @@ def control_menu_state(
     flags = ws.SWP_NOMOVE | ws.SWP_NOSIZE | ws.SWP_NOZORDER | ws.SWP_FRAMECHANGED
     ws.SetWindowPos(hwnd, 0, 0, 0, 0, 0, flags)
 
+
+def GetDesktopWindowHandle():
+    return process.GetDesktopWindowHandle()

@@ -73,6 +73,7 @@ class WindowFinder(QObject):
         self.press_esc = False
         self._candidate_hwnd = None
         self._pid = None
+        self._class_name = None
         self._proc_name = None
         self._proc_path = None
         self._proc_title = None
@@ -98,13 +99,24 @@ class WindowFinder(QObject):
         keyboard.unhook_all()
         loguru.logger.debug('停止查找窗口')
         print()
+    
+    def get_passed_hwnd(self):
+        """获取要排除的 hwnd"""
+        passed_hwnd = [
+            self.highlighter.winId(),                                       # 排除自身窗口
+            ws.FindWindow("Shell_TrayWnd", NULL),                           # 排除任务栏
+            process.GetDesktopWindowHandle(),                               # 排除桌面窗口
+            ws.FindWindow("XamlExplorerHostIslandWindow", NULL)             # 排除任务视图窗口
+        ]
+        return passed_hwnd
 
     def on_mouse_event(self, event):
         """处理鼠标事件"""
         if self.is_finding and isinstance(event, mouse.ButtonEvent) and event.event_type == 'down':
-            if event.button == 'left':
-                loguru.logger.debug('已按下鼠标左键，停止监听，并锁定窗口，返回相应的值')
-                self._trigger_lock.emit()
+            if self._candidate_hwnd not in self.get_passed_hwnd():
+                if event.button == 'left':
+                    loguru.logger.debug('已按下鼠标左键，停止监听，并锁定窗口，返回相应的值')
+                    self._trigger_lock.emit()
 
     def on_key_press(self, event):      
         """键盘按下回调"""
@@ -117,23 +129,41 @@ class WindowFinder(QObject):
         """实时更新所选的目标参量"""
         cursor_pos = QCursor.pos()
         hwnd = self.get_window_under_cursor(cursor_pos.x(), cursor_pos.y())
-
-        # 可能要重新设计，这对多任务窗口不适用（如 Edge）
+        hwnd = ws.GetAncestor(hwnd, ws.GA_ROOTOWNER)       # bug fixed: 修复 hwnd 返回不正确的问题
+        if hwnd in self.get_passed_hwnd():
+            hwnd = None
+        
         if hwnd:
+            self._candidate_hwnd = hwnd 
             rect = self.get_window_rect(hwnd)
             self.highlighter.set_target_rect(rect)
             self._pid = process.get_exec_pid_from_hwnd(hwnd)
-            self._candidate_hwnd = process.get_exec_hwnd_from_pid(self._pid, change_win_settings_hwnd=True)  # bug fixed: 锁设置窗口时，出现不返回 hwnd 的情况
-            self._proc_path = process.GetProcessOrServPathById(self._pid)   
+            self._proc_path = process.GetProcessOrServPathById(self._pid)
             self._proc_name = os.path.basename(self._proc_path)
-            self._proc_title = process.get_exec_title_from_hwnd(self._pid)
+            window_title = (WCHAR * 2048)()
+            ws.GetWindowText(hwnd, window_title, 2048, errcheck=False)
+            self._proc_title = window_title.value
+            class_name = (WCHAR * 2048)()
+            ws.GetClassName(hwnd, class_name, 2048)
+            self._class_name = class_name.value
         else:
             self.highlighter.hide()
             self._pid = None
             self._proc_name = None
             self._proc_path = None
             self._candidate_hwnd = None
-        loguru.logger.debug(f"hwnd={hwnd}, pid={self._pid}, name={self._proc_name}, path={self._proc_path}, title={self._proc_title}, winId={self.highlighter.winId()}")
+            self._proc_title = None
+            self._class_name = None
+
+        loguru.logger.debug(
+            f"hwnd={hwnd}, "
+            f"pid={self._pid}, "
+            f"name={self._proc_name}, "
+            f"path={self._proc_path}, "
+            f"title={self._proc_title}, "
+            f"class_name={self._class_name}, "
+            f"winId={self.highlighter.winId()}"
+        )
 
     def lock_window(self):
         """锁定当前候选窗口"""
@@ -160,4 +190,3 @@ class WindowFinder(QObject):
                      rect.right - rect.left,
                      rect.bottom - rect.top)
     
-
